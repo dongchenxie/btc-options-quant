@@ -3,9 +3,15 @@ import type { BTCPriceData } from './types/priceData';
 import { backtestStrategy, calculatePerformanceMetrics } from './backtest/backtest';
 import { loadBTCPriceDataFromCSV } from './data/csvLoader';
 import path from 'path';
+import { parseISO } from 'date-fns';
 
 // Path to the CSV file (relative to project root)
-const DATA_FILE_PATH = path.resolve(process.cwd(), 'data', 'btc_sample_data.csv');
+const DATA_FILE_PATH = path.resolve(process.cwd(), 'data', 'btcusd_1-min_data.csv');
+
+// Example date range for backtest (optional)
+// Set to undefined to use all available data
+const START_DATE = '2023-01-01T00:00:00Z'; // Format: ISO string
+const END_DATE = '2023-12-31T23:59:59Z';   // Format: ISO string
 
 async function main() {
   console.log("🚀 BTC Options Quant Strategy Starting...");
@@ -38,10 +44,16 @@ async function main() {
       daysToExpiration: 7,
     });
     
-    // Run backtest
-    const results = backtestStrategy(priceData, strategy);
+    // Run backtest with date range
+    console.log("\nRunning backtest...");
+    if (START_DATE && END_DATE) {
+      console.log(`Date range: ${START_DATE} to ${END_DATE}`);
+    }
     
-    console.log("📊 Backtest Results:");
+    const results = backtestStrategy(priceData, strategy, START_DATE, END_DATE);
+    
+    console.log("\n📊 Backtest Results:");
+    console.log(`Date Range: ${results.startDate} to ${results.endDate}`);
     console.log(`Starting BTC: ${results.startingBTC} BTC`);
     console.log(`Final BTC: ${results.finalBTC} BTC`);
     console.log(`BTC Change: ${((results.finalBTC - results.startingBTC) / results.startingBTC * 100).toFixed(2)}%`);
@@ -49,22 +61,35 @@ async function main() {
     console.log(`Final USD: $${results.finalUSD}`);
     console.log(`Total Trades: ${results.totalTrades}`);
     console.log(`Assigned Puts: ${results.assignedPuts}`);
-    console.log(`Total Premium Collected: $${results.totalPremiumCollected}`);
+    console.log(`Total Premium Collected: $${results.totalPremiumCollected.toFixed(2)}`);
     
-    // Calculate performance metrics
-    const lastPrice = priceData.length > 0 ? priceData[priceData.length - 1].p : 0;
-    const metrics = calculatePerformanceMetrics(results, lastPrice);
+    // Calculate and display performance metrics
+    // Use the final price from the filtered data range instead of whole dataset
+    const finalPriceData = priceData.find(p => p.t === results.endDate);
+    
+    if (!finalPriceData) {
+      console.error("Could not determine final BTC price");
+      return;
+    }
+    
+    const finalBTCPrice = finalPriceData.p;
+    const metrics = calculatePerformanceMetrics(results, finalBTCPrice);
     
     console.log("\n📈 Performance Metrics:");
+    console.log(`Final BTC Price: $${finalBTCPrice.toFixed(2)}`);
     console.log(`BTC Growth: ${metrics.btcGrowthPercent.toFixed(2)}%`);
-    console.log(`Portfolio Value Growth: ${metrics.usdValueGrowthPercent.toFixed(2)}%`);
+    console.log(`USD Value Growth: ${metrics.usdValueGrowthPercent.toFixed(2)}%`);
     console.log(`Final Portfolio Value: $${metrics.finalPortfolioValueUSD.toFixed(2)}`);
     
     // Display trading activity
     console.log("\n📋 Trading Activity:");
-    results.trades.forEach((trade, index) => {
-      console.log(`[${index + 1}] ${trade.timestamp} - ${trade.action} @ $${trade.btcPrice.toFixed(2)} | BTC: ${trade.btcBalance.toFixed(8)} | USD: $${trade.usdBalance.toFixed(2)}`);
-    });
+    if (results.trades.length === 0) {
+      console.log("No trades were executed during this period.");
+    } else {
+      results.trades.forEach((trade, index) => {
+        console.log(`[${index + 1}] ${trade.timestamp} - ${trade.action} @ $${trade.btcPrice.toFixed(2)} | BTC: ${trade.btcBalance.toFixed(8)} | USD: $${trade.usdBalance.toFixed(2)}`);
+      });
+    }
     
   } catch (error) {
     console.error("Error running strategy:", error);
@@ -73,4 +98,3 @@ async function main() {
 
 // Run the main function
 main().catch(console.error);
-xcdscxdsq1q 1``

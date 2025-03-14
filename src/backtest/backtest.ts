@@ -1,15 +1,20 @@
 import type { BTCPriceData, BacktestResults } from '../types/priceData';
 import { OptionStrategy } from '../strategy/optionStrategy';
+import { parseISO, isAfter, isBefore } from 'date-fns';
 
 /**
  * Run a backtest of the options strategy using historical price data
  * @param priceData Array of BTC price data points
  * @param strategy Initialized option strategy
+ * @param startDate Optional start date for backtest (ISO string)
+ * @param endDate Optional end date for backtest (ISO string)
  * @returns Backtest results
  */
 export function backtestStrategy(
   priceData: BTCPriceData[],
-  strategy: OptionStrategy
+  strategy: OptionStrategy,
+  startDate?: string,
+  endDate?: string
 ): BacktestResults {
   if (priceData.length === 0) {
     throw new Error('Price data cannot be empty');
@@ -20,12 +25,28 @@ export function backtestStrategy(
     new Date(a.t).getTime() - new Date(b.t).getTime()
   );
 
+  // Filter data by date range if specified
+  const filteredData = sortedData.filter(data => {
+    const dataDate = parseISO(data.t);
+    if (startDate && isBefore(dataDate, parseISO(startDate))) {
+      return false;
+    }
+    if (endDate && isAfter(dataDate, parseISO(endDate))) {
+      return false;
+    }
+    return true;
+  });
+
+  if (filteredData.length === 0) {
+    throw new Error('No data points found in the specified date range');
+  }
+
   // Record initial values
   const startingBTC = strategy.getBTCBalance();
   const startingUSD = strategy.getUSDBalance();
 
   // Process each price data point
-  for (const dataPoint of sortedData) {
+  for (const dataPoint of filteredData) {
     strategy.processPriceData(dataPoint);
   }
 
@@ -44,7 +65,9 @@ export function backtestStrategy(
     totalTrades: trades.length,
     assignedPuts,
     totalPremiumCollected,
-    trades
+    trades,
+    startDate: filteredData[0].t,
+    endDate: filteredData[filteredData.length - 1].t
   };
 }
 

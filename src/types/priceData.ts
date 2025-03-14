@@ -34,6 +34,8 @@ export interface BacktestResults {
   assignedPuts: number;
   totalPremiumCollected: number;
   trades: TradeRecord[];
+  startDate: string;
+  endDate: string;
 }
 
 // Record of individual trades
